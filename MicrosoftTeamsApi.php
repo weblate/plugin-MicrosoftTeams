@@ -42,7 +42,7 @@ class MicrosoftTeamsApi
     private const DRIVE_ID_URL = 'https://graph.microsoft.com/v1.0/sites/{siteID}/drives';
     private const UPLOAD_URL = 'https://graph.microsoft.com/v1.0/drives/{driveID}/root:/{$fileName}:/content';
 
-    private const TEAMS_TIMEOUT = 5000;
+    private const TEAMS_TIMEOUT = 5;
 
     public function __construct(
         #[\SensitiveParameter]
@@ -79,11 +79,11 @@ class MicrosoftTeamsApi
         if (!empty($this->accessToken)) {
             $uploadURL = $this->uploadFileToDriveAndGetLink($fileName, $fileContents);
             if (!empty($uploadURL)) {
-                return $this->sendMessageToTeamsChannel($subject . "<br><a href='$uploadURL'>$fileName</a>'");
+                return $this->sendMessageToTeamsChannel($subject . "<br><a href='$uploadURL'>$fileName</a>");
             }
         }
 
-        $this->logger->debug('Unable to send ' . $fileName . ' report to Microsoft Teams');
+        $this->logger->info('Unable to send ' . $fileName . ' report to Microsoft Teams');
 
         return false;
     }
@@ -106,7 +106,7 @@ class MicrosoftTeamsApi
                 ['Content-Type: application/x-www-form-urlencoded']
             );
         } catch (\Exception $e) {
-            $this->logger->debug('MicrosoftTeams error getAccessToken: ' . $e->getMessage());
+            $this->logger->error('MicrosoftTeams error getAccessToken: ' . $e->getMessage());
             return '';
         }
 
@@ -149,7 +149,7 @@ class MicrosoftTeamsApi
                 'PUT'
             );
         } catch (\Exception $e) {
-            $this->logger->debug('MicrosoftTeams error uploadFileToDriveAndGetLink: ' . $e->getMessage());
+            $this->logger->error('MicrosoftTeams error uploadFileToDriveAndGetLink: ' . $e->getMessage());
             return '';
         }
 
@@ -177,7 +177,7 @@ class MicrosoftTeamsApi
                 true
             );
         } catch (\Exception $e) {
-            $this->logger->debug('MicrosoftTeams error sendMessageToTeamsChannel: ' . $e->getMessage());
+            $this->logger->error('MicrosoftTeams error sendMessageToTeamsChannel: ' . $e->getMessage());
             return false;
         }
 
@@ -187,7 +187,7 @@ class MicrosoftTeamsApi
     /**
      * @return string
      */
-    private function getTeamsSiteId(): string
+    public function getTeamsSiteId(): string
     {
         try {
             $response = $this->sendHttpRequest(
@@ -199,7 +199,7 @@ class MicrosoftTeamsApi
                 'GET'
             );
         } catch (\Exception $e) {
-            $this->logger->debug('MicrosoftTeams error getTeamsSiteId: ' . $e->getMessage());
+            $this->logger->error('MicrosoftTeams error getTeamsSiteId: ' . $e->getMessage());
             return '';
         }
 
@@ -215,7 +215,7 @@ class MicrosoftTeamsApi
      * @param string $siteID
      * @return string
      */
-    private function getTeamsDriveId(string $siteID): string
+    public function getTeamsDriveId(string $siteID): string
     {
         try {
             $response = $this->sendHttpRequest(
@@ -227,7 +227,7 @@ class MicrosoftTeamsApi
                 'GET'
             );
         } catch (\Exception $e) {
-            $this->logger->debug('MicrosoftTeams error getTeamsDriveId: ' . $e->getMessage());
+            $this->logger->error('MicrosoftTeams error getTeamsDriveId: ' . $e->getMessage());
             return '';
         }
 
@@ -235,7 +235,7 @@ class MicrosoftTeamsApi
         $driveID = '';
         if (!empty($data['value'])) {
             foreach ($data['value'] as $drive) {
-                if ($drive['name'] === 'Documents') {
+                if (!empty($drive['id'])) {
                     $driveID = $drive['id'];
                     break;
                 }
@@ -252,7 +252,7 @@ class MicrosoftTeamsApi
      * @param array $additionalHeaders
      * @param $requestBodyAsString
      * @param $httpMethod
-     * @return array|int[]|string
+     * @return string
      * @throws \Exception
      */
     private function sendHttpRequest(string $url, int $timeout, ?array $requestBody, array $additionalHeaders = [], $requestBodyAsString = false, $httpMethod = 'POST')

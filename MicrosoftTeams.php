@@ -17,6 +17,7 @@ use Piwik\Piwik;
 use Piwik\Plugins\ScheduledReports\ScheduledReports;
 use Piwik\ReportRenderer;
 use Piwik\SettingsPiwik;
+use Piwik\UrlHelper;
 use Piwik\View;
 
 class MicrosoftTeams extends \Piwik\Plugin
@@ -77,7 +78,6 @@ class MicrosoftTeams extends \Piwik\Plugin
         $translationKeys[] = 'MicrosoftTeams_TenantIdTitle';
         $translationKeys[] = 'MicrosoftTeams_TenantIdDescription';
         $translationKeys[] = 'MicrosoftTeams_TeamsEnterYourWebhookUrlText';
-        $translationKeys[] = 'MicrosoftTeams_RequiredFieldsNotSet';
     }
 
     /**
@@ -134,6 +134,8 @@ class MicrosoftTeams extends \Piwik\Plugin
             throw new \Exception(Piwik::translate('MicrosoftTeams_RequiredFieldsNotSet'));
         } elseif (empty($parameters[self::MS_TEAMS_INCOMING_WEBHOOK_URL_PARAMETER])) {
             throw new \Exception(Piwik::translate('MicrosoftTeams_IncomingWebhookRequiredErrorMessage'));
+        } elseif (!UrlHelper::isLookLikeUrl($parameters[self::MS_TEAMS_INCOMING_WEBHOOK_URL_PARAMETER])) {
+            throw new \Exception(Piwik::translate('MicrosoftTeams_IncomingWebhookInvalidErrorMessage'));
         }
     }
 
@@ -328,9 +330,7 @@ class MicrosoftTeams extends \Piwik\Plugin
         // Safeguard against sending the same report twice to the same Teams channel (unless $force is true)
         if (!$force && $this->reportAlreadySent($report, $period)) {
             $logger->warning(
-                'Preventing the same scheduled report from being sent again (report #%s for period "%s")',
-                $report['idreport'],
-                $prettyDate
+                sprintf('Preventing the same scheduled report from being sent again (report #%s for period "%s")', $report['idreport'], $report['period'])
             );
             return;
         }
@@ -362,8 +362,12 @@ class MicrosoftTeams extends \Piwik\Plugin
      */
     public function validateCustomAlertReportParameters($parameters, $alertMedium)
     {
-        if ($alertMedium === self::MS_TEAMS_TYPE && empty($parameters[self::MS_TEAMS_INCOMING_WEBHOOK_URL_PARAMETER])) {
-            throw new \Exception(Piwik::translate('MicrosoftTeams_IncomingWebhookRequiredErrorMessage'));
+        if ($alertMedium === self::MS_TEAMS_TYPE) {
+            if (empty($parameters[self::MS_TEAMS_INCOMING_WEBHOOK_URL_PARAMETER])) {
+                throw new \Exception(Piwik::translate('MicrosoftTeams_IncomingWebhookRequiredErrorMessage'));
+            } elseif (!UrlHelper::isLookLikeUrl($parameters[self::MS_TEAMS_INCOMING_WEBHOOK_URL_PARAMETER])) {
+                throw new \Exception(Piwik::translate('MicrosoftTeams_IncomingWebhookInvalidErrorMessage'));
+            }
         }
     }
 
@@ -386,7 +390,7 @@ class MicrosoftTeams extends \Piwik\Plugin
                 $msTeamsApi = new MicrosoftTeamsApi($msTeamsWebhookUrl);
                 if (!$msTeamsApi->sendMessageToTeamsChannel(implode("<br>", $alert['message']))) {
                     $logger = StaticContainer::get(LoggerInterface::class);
-                    $logger->debug('MicrosoftTeams alert failed for following alerts: ' . implode("\n", $alert['name']));
+                    $logger->info('MicrosoftTeams alert failed for following alerts: ' . implode("\n", $alert['name']));
                 }
             }
         }
@@ -432,7 +436,7 @@ class MicrosoftTeams extends \Piwik\Plugin
             $settingURL .= 'index.php';
         }
         $settingURL .= '?idSite=' . $alert['idsite'];
-        $siteName = $alert['siteName'];
+        $siteName = htmlspecialchars($alert['siteName'], ENT_QUOTES);
         $siteWithLink = "<a href='$settingURL'>$siteName</a>";
         return Piwik::translate('MicrosoftTeams_MicrosoftTeamsAlertContent', [$alert['name'], $siteWithLink, $metric, $reportName, $this->transformAlertCondition($alert)]);
     }
