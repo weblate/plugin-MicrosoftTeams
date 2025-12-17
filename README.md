@@ -1,1 +1,3 @@
-# plugin-MicrosoftTeams
+# Matomo MicrosoftTeams Plugin
+
+## Description
